@@ -5,7 +5,7 @@
 use core::panic;
 use std::collections::HashMap;
 use std::fs::{self, File, read_to_string};
-use std::io::Read;
+use std::io::{Write, Read};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 #[cfg(any(target_os = "android", target_env = "ohos"))]
@@ -492,6 +492,18 @@ struct CmdArgs {
     #[bpaf(short('u'),long,argument::<String>("NCSA mosaic/1.0 (X11;SunOS 4.1.4 sun4m"))]
     user_agent: Option<String>,
 
+    /// Set custom homepage (default "https://www.servo.org"). [EXP_MRJ241]
+    #[bpaf(long,argument::<String>("https://www.servo.org"))]
+    homepage_url: Option<String>,
+    
+    /// Set your custom search engine (default: https://duckduckgo.com/html/). [EXP_MRJ241]
+    #[bpaf(long,argument::<String>("https://duckduckgo.com/html/"))]
+    searchpage_url: Option<String>,
+    
+    /// Set your custom search textbox (default: Search the web…). [EXP_MRJ241]
+    #[bpaf(long,argument::<String>("Search the web…"))]
+    searchpage_text: Option<String>,
+
     /// Uses userscripts in resources/user-agent-js, or a specified full path.
     #[bpaf(external)]
     userscripts: Option<PathBuf>,
@@ -625,8 +637,48 @@ pub(crate) fn parse_command_line_arguments(args: Vec<String>) -> ArgumentParsing
             default_window_size.min(screen_size_override)
         });
 
+    let homepage_url = cmd_args.homepage_url.clone().unwrap_or("https://www.servo.org".into());
+    let searchpage_url = cmd_args.searchpage_url.clone().unwrap_or("https://duckduckgo.com/html/".into());
+    let searchpage_text = cmd_args.searchpage_text.clone().unwrap_or("Search the web…".into());
+    
+    println!("[CURR DIR] {:?}",env::current_dir());
+    
+    let file_path = "../../resources/resource_protocol/newtab.html";
+    let template_path = "../../resources/resource_protocol/newtab-template.html";
+    
+    if fs::metadata(template_path).is_ok() {   
+        let template_str = fs::read_to_string(template_path).expect("Error in reading the file");
+        
+        //let content = searchpage_url;
+        // --searchpage-url=https://ecosia.org/search
+        let content_0 = str::replace(&template_str, "https://duckduckgo.com/html/", &searchpage_url);
+        let content = str::replace(&content_0, "Search the web…", &searchpage_text);
+        // Unsafe code
+        let mut file = fs::File::create(file_path).unwrap();
+        file.write_all(content.as_bytes()).unwrap();
+    } else {
+        let file_path = "resources/resource_protocol/newtab.html";
+        let template_path = "resources/resource_protocol/newtab-template.html";
+        
+        if fs::metadata(template_path).is_ok() {   
+
+            let template_str = fs::read_to_string(template_path).expect("Error in reading the file");
+            
+            //let content = searchpage_url;
+            // --searchpage-url=https://ecosia.org/search
+            let content_0 = str::replace(&template_str, "https://duckduckgo.com/html/", &searchpage_url);
+            let content = str::replace(&content_0, "Search the web…", &searchpage_text);
+            // Unsafe code
+            let mut file = fs::File::create(file_path).unwrap();
+            file.write_all(content.as_bytes()).unwrap();
+        }
+    }
+    
+    println!("[HOMEPAGE] {:?}",homepage_url);
+
     let servoshell_preferences = ServoShellPreferences {
-        url: Some(cmd_args.url),
+        //url: Some(cmd_args.url),
+        url: Some(homepage_url),        
         no_native_titlebar: cmd_args.no_native_titlebar,
         device_pixel_ratio_override,
         clean_shutdown: cmd_args.clean_shutdown,
